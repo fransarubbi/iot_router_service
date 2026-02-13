@@ -40,8 +40,8 @@ message FromEdge {
     SystemMetrics metric = 6;
     Settings settings = 7;
     SettingOk setting_ok = 8;
-    FirmwareOutcome firmware_outcome = 12;
-    HelloWorld hello_world = 13;
+    FirmwareOutcome firmware_outcome = 9;
+    HelloWorld hello_world = 10;
   }
 }
 
