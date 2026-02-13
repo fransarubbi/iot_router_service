@@ -1,6 +1,22 @@
 [package]
-name = "iot_in_store_service"
+name = "iot_router_service"
 version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+# Async Runtime
+tokio = { version = "1.48", features = ["rt-multi-thread", "macros"] }
+
+# Logging
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
+
+# gRPC (Protobuf)
+tonic = { version = "0.12", features = ["tls", "tls-roots", "transport", "gzip"] }
+prost = "0.13"
+tokio-stream = "0.1.17"
+dotenv = "0.15.0"
+
+
+[build-dependencies]
+tonic-build = "0.12"

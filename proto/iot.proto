@@ -1,0 +1,207 @@
+syntax = "proto3";
+
+package grpc;
+
+
+service EdgeService {
+  // Streaming Bidireccional
+  rpc ConnectStream(stream FromEdge) returns (stream ToEdge);
+}
+
+service ManagerService {
+  // Streaming Bidireccional
+  rpc ConnectStream(stream FromManager) returns (stream ToManager);
+}
+
+service DataService {
+  // Streaming Bidireccional
+  rpc ConnectStream(stream FromDataSaver) returns (stream ToDataSaver);
+}
+
+message ToEdge {
+  string edge_id = 1;
+  oneof payload {
+    SettingOk setting_ok = 2;
+    UpdateFirmware update_firmware = 3;
+    Network network = 4;
+    DeleteHub delete_hub = 5;
+    Settings settings = 6;
+    Heartbeat heartbeat = 7;
+  }
+}
+
+message FromEdge {
+  string edge_id = 1;
+  oneof payload {
+    Measurement measurement = 2;
+    Monitor monitor = 3;
+    AlertAir alert_air = 4;
+    AlertTh alert_th = 5;
+    SystemMetrics metric = 6;
+    Settings settings = 7;
+    SettingOk setting_ok = 8;
+    FirmwareOutcome firmware_outcome = 12;
+    HelloWorld hello_world = 13;
+  }
+}
+
+message ToManager {
+  string edge_id = 1;
+  oneof payload {
+    Settings settings = 2;
+    SettingOk setting_ok = 3;
+    FirmwareOutcome firmware_outcome = 4;
+    HelloWorld hello_world = 5;
+  }
+}
+
+message FromManager {
+  string edge_id = 1;
+  oneof payload {
+    SettingOk setting_ok = 2;
+    UpdateFirmware update_firmware = 3;
+    Network network = 4;
+    DeleteHub delete_hub = 5;
+    Settings settings = 6;
+  }
+}
+
+message ToDataSaver {
+  oneof payload {
+    Measurement measurement = 1;
+    Monitor monitor = 2;
+    SystemMetrics metric = 3;
+    AlertAir alert_air = 4;
+    AlertTh alert_th = 5;
+  }
+}
+
+message FromDataSaver {
+  oneof payload {
+    Heartbeat heartbeat = 1;
+  }
+}
+
+
+message Metadata {
+  string sender_user_id = 1;
+  string destination_id = 2;
+  int64 timestamp = 3;
+}
+
+message Measurement {
+  Metadata metadata = 1;
+  string network = 2;
+  int64 pulse_counter = 3;
+  int64 pulse_max_duration = 4;
+  float temperature = 5;
+  float humidity = 6;
+  float co2_ppm = 7;
+  uint32 sample = 8;
+}
+
+message AlertAir {
+  Metadata metadata = 1;
+  string network = 2;
+  float co2_initial_ppm = 3;
+  float co2_actual_ppm = 4;
+}
+
+message AlertTh {
+  Metadata metadata = 1;
+  string network = 2;
+  float initial_temp = 3;
+  float actual_temp = 4;
+}
+
+message Monitor {
+  Metadata metadata = 1;
+  string network = 2;
+  int64 mem_free = 3;
+  int64 mem_free_hm = 4;
+  int64 mem_free_block = 5;
+  int64 mem_free_internal = 6;
+  int64 stack_free_min_coll = 7;
+  int64 stack_free_min_pub = 8;
+  int64 stack_free_min_mic = 9;
+  int64 stack_free_min_th = 10;
+  int64 stack_free_min_air = 11;
+  int64 stack_free_min_mon = 12;
+  string wifi_ssid = 13;
+  int32 wifi_rssi = 14;
+  int64 active_time = 15;
+}
+
+message Settings {
+  Metadata metadata = 1;
+  string network = 2;
+  string wifi_ssid = 3;
+  string wifi_password = 4;
+  string mqtt_uri = 5;
+  string device_name = 6;
+  uint32 sample = 7;
+  uint32 energy_mode = 8;
+}
+
+message SettingOk {
+  Metadata metadata = 1;
+  string network = 2;
+  bool handshake = 3;
+}
+
+message Network {
+  Metadata metadata = 1;
+  string id_network = 2;
+  string name_network = 3;
+  bool active = 4;
+  bool delete_network = 5;
+}
+
+message DeleteHub {
+  Metadata metadata = 1;
+  string network = 2;
+}
+
+message ActiveHub {
+  Metadata metadata = 1;
+  string network = 2;
+  bool active = 3;
+}
+
+message Heartbeat {
+  Metadata metadata = 1;
+  bool beat = 2;
+}
+
+message UpdateFirmware {
+  Metadata metadata = 1;
+  string network = 2;
+}
+
+message FirmwareOutcome {
+  Metadata metadata = 1;
+  string network = 2;
+  bool is_ok = 3;
+  float percentage_ok = 4;
+}
+
+message HelloWorld {
+  Metadata metadata = 1;
+  bool hello = 2;
+}
+
+message SystemMetrics {
+  Metadata metadata = 1;
+  uint64 uptime_seconds = 2;
+  float cpu_usage_percent = 3;
+  float cpu_temp_celsius = 4;
+  uint64 ram_total_mb = 5;
+  uint64 ram_used_mb = 6;
+  uint64 sd_total_gb = 7;
+  uint64 sd_used_gb = 8;
+  float sd_usage_percent = 9;
+  uint64 network_rx_bytes = 10;
+  uint64 network_tx_bytes = 11;
+  int32 wifi_rssi = 12;
+  int32 wifi_signal_dbm = 13;
+}
