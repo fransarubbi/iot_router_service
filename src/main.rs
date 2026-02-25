@@ -8,6 +8,7 @@ use crate::system::domain::{init_server, init_tracing, System};
 mod grpc_service;
 mod router;
 mod system;
+mod config;
 
 pub mod grpc {
     tonic::include_proto!("grpc");

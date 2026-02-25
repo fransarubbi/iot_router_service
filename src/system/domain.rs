@@ -10,6 +10,7 @@ use std::{env, fs};
 use tonic::transport::{Certificate, Identity, Server, ServerTlsConfig};
 use tracing::info;
 use tracing_subscriber::{fmt, EnvFilter};
+use crate::config::certs::{CA_ROUTER, CRT_ROUTER, KEY_ROUTER};
 use crate::grpc::data_service_server::DataServiceServer;
 use crate::grpc::edge_service_server::EdgeServiceServer;
 use crate::grpc::manager_service_server::ManagerServiceServer;
@@ -129,12 +130,12 @@ pub async fn init_server(edge_service: EdgeServiceImpl,
     // ════════════════════════════════════════════════════════════════════
 
     // Cargamos la CA que valida a las Raspberrys
-    let client_ca_pem = fs::read_to_string("certs/ca.pem")?;
+    let client_ca_pem = fs::read_to_string(CA_ROUTER)?;
     let client_ca_cert = Certificate::from_pem(client_ca_pem);
 
     // El certificado y llave privada de este Servidor (Router)
-    let server_cert_pem = fs::read_to_string("certs/server.pem")?;
-    let server_key_pem = fs::read_to_string("certs/server.key")?;
+    let server_cert_pem = fs::read_to_string(CRT_ROUTER)?;
+    let server_key_pem = fs::read_to_string(KEY_ROUTER)?;
     let server_identity = Identity::from_pem(server_cert_pem, server_key_pem);
 
     // Configuración mTLS: pedir certificado al cliente y validar con la CA
