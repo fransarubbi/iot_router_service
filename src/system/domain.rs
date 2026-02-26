@@ -16,6 +16,7 @@ use crate::grpc::edge_service_server::EdgeServiceServer;
 use crate::grpc::manager_service_server::ManagerServiceServer;
 use crate::grpc_service::domain::{DataServiceImpl, EdgeServiceImpl, ManagerServiceImpl};
 
+
 #[derive(Debug)]
 pub struct System {
     /// Host donde escuchará o se conectará el servicio gRPC.
@@ -122,7 +123,7 @@ pub fn init_tracing(system: &System) {
 pub async fn init_server(edge_service: EdgeServiceImpl,
                          manager_service: ManagerServiceImpl,
                          data_service: DataServiceImpl,
-                         system: &System
+                         system: &System,
 ) -> Result<(), Box<dyn std::error::Error>> {
 
     // ════════════════════════════════════════════════════════════════════
