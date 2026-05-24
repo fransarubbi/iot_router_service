@@ -76,6 +76,46 @@ pub async fn process_from_edge(msg: FromEdge, central_tx: &mpsc::Sender<RouterMe
                     error!("Error: no se pudo enviar mensaje a traves de central_tx");
                 }
             },
+            Payload::MeasurementBatch(measurement) => {
+                let router_msg = RouterMessage::ToData {
+                    message: ToDataSaver {
+                        payload: Some(to_data_saver::Payload::MeasurementBatch(measurement)),
+                    },
+                };
+                if central_tx.send(router_msg).await.is_err() {
+                    error!("Error: no se pudo enviar mensaje a traves de central_tx");
+                }
+            },
+            Payload::MonitorBatch(monitor) => {
+                let router_msg = RouterMessage::ToData {
+                    message: ToDataSaver {
+                        payload: Some(to_data_saver::Payload::MonitorBatch(monitor)),
+                    },
+                };
+                if central_tx.send(router_msg).await.is_err() {
+                    error!("Error: no se pudo enviar mensaje a traves de central_tx");
+                }
+            },
+            Payload::AlertAirBatch(alert) => {
+                let router_msg = RouterMessage::ToData {
+                    message: ToDataSaver {
+                        payload: Some(to_data_saver::Payload::AlertAirBatch(alert)),
+                    },
+                };
+                if central_tx.send(router_msg).await.is_err() {
+                    error!("Error: no se pudo enviar mensaje a traves de central_tx");
+                }
+            },
+            Payload::AlertThBatch(alert) => {
+                let router_msg = RouterMessage::ToData {
+                    message: ToDataSaver {
+                        payload: Some(to_data_saver::Payload::AlertThBatch(alert)),
+                    },
+                };
+                if central_tx.send(router_msg).await.is_err() {
+                    error!("Error: no se pudo enviar mensaje a traves de central_tx");
+                }
+            },
             Payload::Metric(metric) => {
                 let router_msg = RouterMessage::ToData {
                     message: ToDataSaver {

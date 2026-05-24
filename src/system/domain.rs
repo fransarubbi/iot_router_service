@@ -11,10 +11,12 @@ use tonic::transport::{Certificate, Identity, Server, ServerTlsConfig};
 use tracing::info;
 use tracing_subscriber::{fmt, EnvFilter};
 use crate::config::certs::{CA_ROUTER, CRT_ROUTER, KEY_ROUTER};
+use crate::metrics::logic::init_global;
 use crate::grpc::data_service_server::DataServiceServer;
 use crate::grpc::edge_service_server::EdgeServiceServer;
 use crate::grpc::manager_service_server::ManagerServiceServer;
 use crate::grpc_service::domain::{DataServiceImpl, EdgeServiceImpl, ManagerServiceImpl};
+use crate::https::domain::HttpsService;
 
 
 #[derive(Debug)]
@@ -123,6 +125,7 @@ pub fn init_tracing(system: &System) {
 pub async fn init_server(edge_service: EdgeServiceImpl,
                          manager_service: ManagerServiceImpl,
                          data_service: DataServiceImpl,
+                         https_service: HttpsService,
                          system: &System,
 ) -> Result<(), Box<dyn std::error::Error>> {
 
@@ -179,10 +182,31 @@ pub async fn init_server(edge_service: EdgeServiceImpl,
             .await
     };
 
-    // Ejecutamos ambos futuros concurrentemente.
-    // Si uno falla, 'try_join' retorna el error inmediatamente y cancela el otro.
-    tokio::try_join!(edge_server, mgmt_server)?;
-    info!("Info: iniciando todos los servicios gRPC...");
+    init_global();
+
+    https_service.registry.clone().start_reaper(std::time::Duration::from_secs(10));
+    let https_app = crate::https::domain::build_router(https_service.clone());
+
+    let axum_tls_config = axum_server::tls_rustls::RustlsConfig::from_config(
+        crate::mtls::logic::build_mtls_config(CRT_ROUTER, KEY_ROUTER, CA_ROUTER)?
+    );
+
+    let addr_https = format!("{}:{}", system.grpc_host, 443).parse()?;
+
+    let https_server = async {
+        info!("Info: servidor HTTPS mTLS escuchando en {}", addr_https);
+        axum_server::bind_rustls(addr_https, axum_tls_config)
+            .serve(https_app.into_make_service_with_connect_info::<std::net::SocketAddr>())
+            .await
+    };
+
+    info!("Info: iniciando todos los servicios gRPC y HTTPS...");
+    
+    tokio::try_join!(
+        async { edge_server.await.map_err(anyhow::Error::from) },
+        async { mgmt_server.await.map_err(anyhow::Error::from) },
+        async { https_server.await.map_err(anyhow::Error::from) }
+    )?;
 
     Ok(())
 }
