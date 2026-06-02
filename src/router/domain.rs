@@ -92,7 +92,7 @@ impl RoutingTable {
             false
         } else {
             edges.insert(edge_id.to_string(), tx);
-            info!("Info: edge con id: {} registrado", edge_id);
+            info!("edge con id: {} registrado", edge_id);
             true
         }
     }
@@ -100,31 +100,31 @@ impl RoutingTable {
     /// Elimina la conexión del Edge (ej: al desconectarse).
     pub async fn unregister_edge(&self, edge_id: &str) {
         self.edges.write().await.remove(edge_id);
-        info!("Info: edge con id: {} eliminado", edge_id);
+        info!("edge con id: {} eliminado", edge_id);
     }
 
     /// Registra la conexión del Manager.
     pub async fn register_manager(&self, tx: mpsc::Sender<Result<ToManager, Status>>) {
         *self.manager.write().await = Some(tx);
-        info!("Info: manager registrado");
+        info!("manager registrado");
     }
 
     /// Elimina la conexión del Manager (ej: al desconectarse).
     pub async fn unregister_manager(&self) {
         *self.manager.write().await = None;
-        info!("Info: manager eliminado");
+        info!("manager eliminado");
     }
 
     /// Registra la conexión del Data Saver.
     pub async fn register_data(&self, tx: mpsc::Sender<Result<ToDataSaver, Status>>) {
         *self.data.write().await = Some(tx);
-        info!("Info: data registrado");
+        info!("data registrado");
     }
 
     /// Elimina la conexión del Data Saver.
     pub async fn unregister_data(&self) {
         *self.data.write().await = None;
-        warn!("Info: data eliminado");
+        warn!("data eliminado");
     }
 
     /// **Enviar Unicast a Edge**
@@ -202,17 +202,17 @@ impl RoutingTable {
 pub async fn dispatcher_task(mut rx: mpsc::Receiver<RouterMessage>,
                              routing_table: Arc<RoutingTable>) {
 
-    info!("Info: dispatcher iniciado");
+    info!("dispatcher iniciado");
 
     while let Some(msg) = rx.recv().await {
         match msg {
             RouterMessage::ToEdge { destination_edge_id, message } => {
                 if let Some(to_edge::Payload::Heartbeat(hb)) = &message.payload {
                     let count = routing_table.broadcast_heartbeat_to_edges(hb.clone()).await;
-                    debug!("Debug: Broadcast enviado a {} dispositivos", count);
+                    debug!("broadcast enviado a {} dispositivos", count);
                 }
                 else {
-                    debug!("Debug: Enrutando unicast a edge {}", destination_edge_id);
+                    debug!("enrutando unicast a edge {}", destination_edge_id);
                     if let Err(e) = routing_table.send_to_edge(&destination_edge_id, message).await {
                         error!("Error: no se pudo enviar mensaje a edge {}. {}", destination_edge_id, e);
                     }
@@ -220,7 +220,7 @@ pub async fn dispatcher_task(mut rx: mpsc::Receiver<RouterMessage>,
             }
 
             RouterMessage::ToManager { message } => {
-                debug!("Debug: enrutando a manager");
+                debug!("enrutando a manager");
 
                 if let Err(e) = routing_table.send_to_manager(message).await {
                     error!("Error: no se pudo enviar mensaje a Manager. {}", e);
@@ -228,7 +228,7 @@ pub async fn dispatcher_task(mut rx: mpsc::Receiver<RouterMessage>,
             }
 
             RouterMessage::ToData { message } => {
-                debug!("Debug: enrutando a data");
+                debug!("enrutando a data");
 
                 if let Err(e) = routing_table.send_to_data(message).await {
                     error!("Error: no se pudo enviar mensaje a Data. {}", e);

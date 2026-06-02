@@ -59,7 +59,7 @@ impl EdgeService for EdgeServiceImpl {
                             request: Request<Streaming<FromEdge>>,
     ) -> Result<Response<Self::ConnectStreamStream>, Status> {
 
-        info!("Info: nueva conexión edge");
+        info!("nueva conexión edge");
 
         let mut inbound_stream = request.into_inner();
         let (tx_to_edge, rx_to_edge) = mpsc::channel::<Result<ToEdge, Status>>(100);
@@ -97,7 +97,7 @@ impl EdgeService for EdgeServiceImpl {
             }
 
             if let Some(id) = connected_edge_id {
-                info!("Info: conexión cerrada para edge: {}", id);
+                info!("conexión cerrada para edge: {}", id);
                 routing_table.unregister_edge(&id).await;
             } else {
                 info!("Info: conexión anónima cerrada");
@@ -140,7 +140,7 @@ impl ManagerService for ManagerServiceImpl {
                             request: Request<Streaming<FromManager>>,
     ) -> Result<Response<Self::ConnectStreamStream>, Status> {
 
-        info!("Info: manager conectado");
+        info!("manager conectado");
 
         let mut inbound_stream = request.into_inner();
         let (tx_to_manager, rx_to_manager) = mpsc::channel::<Result<ToManager, Status>>(100);
@@ -162,7 +162,7 @@ impl ManagerService for ManagerServiceImpl {
                     }
                 }
             }
-            info!("Info: manager desconectado");
+            info!("manager desconectado");
             routing_table.unregister_manager().await;
         });
 
