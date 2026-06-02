@@ -101,7 +101,10 @@ pub fn init_tracing(system: &System) {
     let filter = EnvFilter::try_new(&system.rust_log)
         .unwrap_or_else(|_| EnvFilter::new("info"));
 
-    let builder = fmt().with_env_filter(filter).with_target(false);
+    let builder = fmt()
+        .pretty()
+        .with_env_filter(filter)
+        .with_target(false);
 
     if system.environment == "production" {
         builder.json().init();
@@ -160,6 +163,10 @@ pub async fn init_server(edge_service: EdgeServiceImpl,
         info!("Info: servidor edge (mTLS) escuchando en {}", addr_edge);
         Server::builder()
             .tls_config(tls_config)?
+            // Permite que el canal esté en silencio hasta 40 segundos antes de enviar un ping
+            .http2_keepalive_interval(Some(std::time::Duration::from_secs(40)))
+            // Si envía el ping, espera 20 segundos la respuesta antes de cortar
+            .http2_keepalive_timeout(Some(std::time::Duration::from_secs(20)))
             .add_service(
                 EdgeServiceServer::new(edge_service)
                     .send_compressed(tonic::codec::CompressionEncoding::Gzip)

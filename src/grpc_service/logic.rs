@@ -33,10 +33,10 @@ pub async fn process_from_edge(msg: FromEdge, central_tx: &mpsc::Sender<RouterMe
     use crate::grpc::from_edge::Payload;
 
     if let Some(payload) = msg.payload {
-        debug!("Debug: mensaje recibido desde edge");
         match payload {
             // Mensajes que van a data
             Payload::Measurement(measurement) => {
+                debug!("mensaje Measurement recibido desde edge");
                 let router_msg = RouterMessage::ToData {
                     message: ToDataSaver {
                         payload: Some(to_data_saver::Payload::Measurement(measurement)),
@@ -47,6 +47,7 @@ pub async fn process_from_edge(msg: FromEdge, central_tx: &mpsc::Sender<RouterMe
                 }
             },
             Payload::Monitor(monitor) => {
+                debug!("mensaje Monitor recibido desde edge");
                 let router_msg = RouterMessage::ToData {
                     message: ToDataSaver {
                         payload: Some(to_data_saver::Payload::Monitor(monitor)),
@@ -57,6 +58,7 @@ pub async fn process_from_edge(msg: FromEdge, central_tx: &mpsc::Sender<RouterMe
                 }
             },
             Payload::AlertAir(alert) => {
+                debug!("mensaje AlertAir recibido desde edge");
                 let router_msg = RouterMessage::ToData {
                     message: ToDataSaver {
                         payload: Some(to_data_saver::Payload::AlertAir(alert)),
@@ -67,6 +69,7 @@ pub async fn process_from_edge(msg: FromEdge, central_tx: &mpsc::Sender<RouterMe
                 }
             },
             Payload::AlertTh(alert) => {
+                debug!("mensaje AlertTh recibido desde edge");
                 let router_msg = RouterMessage::ToData {
                     message: ToDataSaver {
                         payload: Some(to_data_saver::Payload::AlertTh(alert)),
@@ -77,6 +80,7 @@ pub async fn process_from_edge(msg: FromEdge, central_tx: &mpsc::Sender<RouterMe
                 }
             },
             Payload::MeasurementBatch(measurement) => {
+                debug!("mensaje MeasurementBatch recibido desde edge");
                 let router_msg = RouterMessage::ToData {
                     message: ToDataSaver {
                         payload: Some(to_data_saver::Payload::MeasurementBatch(measurement)),
@@ -87,6 +91,7 @@ pub async fn process_from_edge(msg: FromEdge, central_tx: &mpsc::Sender<RouterMe
                 }
             },
             Payload::MonitorBatch(monitor) => {
+                debug!("mensaje MonitorBatch recibido desde edge");
                 let router_msg = RouterMessage::ToData {
                     message: ToDataSaver {
                         payload: Some(to_data_saver::Payload::MonitorBatch(monitor)),
@@ -97,6 +102,7 @@ pub async fn process_from_edge(msg: FromEdge, central_tx: &mpsc::Sender<RouterMe
                 }
             },
             Payload::AlertAirBatch(alert) => {
+                debug!("mensaje AlertAirBatch recibido desde edge");
                 let router_msg = RouterMessage::ToData {
                     message: ToDataSaver {
                         payload: Some(to_data_saver::Payload::AlertAirBatch(alert)),
@@ -107,6 +113,7 @@ pub async fn process_from_edge(msg: FromEdge, central_tx: &mpsc::Sender<RouterMe
                 }
             },
             Payload::AlertThBatch(alert) => {
+                debug!("mensaje AlertThBatch recibido desde edge");
                 let router_msg = RouterMessage::ToData {
                     message: ToDataSaver {
                         payload: Some(to_data_saver::Payload::AlertThBatch(alert)),
@@ -117,6 +124,7 @@ pub async fn process_from_edge(msg: FromEdge, central_tx: &mpsc::Sender<RouterMe
                 }
             },
             Payload::Metric(metric) => {
+                debug!("mensaje Metric recibido desde edge");
                 let router_msg = RouterMessage::ToData {
                     message: ToDataSaver {
                         payload: Some(to_data_saver::Payload::Metric(metric)),
@@ -129,6 +137,7 @@ pub async fn process_from_edge(msg: FromEdge, central_tx: &mpsc::Sender<RouterMe
 
             // Mensajes que van a Manager
             Payload::Settings(settings) => {
+                debug!("mensaje Settings recibido desde edge");
                 let router_msg = RouterMessage::ToManager {
                     message: ToManager {
                         edge_id: msg.edge_id.clone(),
@@ -140,6 +149,7 @@ pub async fn process_from_edge(msg: FromEdge, central_tx: &mpsc::Sender<RouterMe
                 }
             },
             Payload::SettingOk(setting_ok) => {
+                debug!("mensaje SettingsOk recibido desde edge");
                 let router_msg = RouterMessage::ToManager {
                     message: ToManager {
                         edge_id: msg.edge_id.clone(),
@@ -151,6 +161,7 @@ pub async fn process_from_edge(msg: FromEdge, central_tx: &mpsc::Sender<RouterMe
                 }
             },
             Payload::FirmwareOutcome(outcome) => {
+                debug!("mensaje FirmwareOutcome recibido desde edge");
                 let router_msg = RouterMessage::ToManager {
                     message: ToManager {
                         edge_id: msg.edge_id.clone(),
@@ -162,6 +173,7 @@ pub async fn process_from_edge(msg: FromEdge, central_tx: &mpsc::Sender<RouterMe
                 }
             },
             Payload::HelloWorld(hello) => {
+                debug!("mensaje HelloWorld recibido desde edge");
                 let router_msg = RouterMessage::ToManager {
                     message: ToManager {
                         edge_id: msg.edge_id.clone(),
@@ -186,13 +198,27 @@ pub async fn process_from_manager(msg: FromManager, central_tx: &mpsc::Sender<Ro
 
     if let Some(payload) = msg.payload {
         use from_manager::Payload;
-        debug!("Debug: mensaje recibido desde manager");
         let to_edge_payload = match payload {
-            Payload::SettingOk(s) => Some(to_edge::Payload::SettingOk(s)),
-            Payload::UpdateFirmware(u) => Some(to_edge::Payload::UpdateFirmware(u)),
-            Payload::Network(n) => Some(to_edge::Payload::Network(n)),
-            Payload::DeleteHub(d) => Some(to_edge::Payload::DeleteHub(d)),
-            Payload::Settings(s) => Some(to_edge::Payload::Settings(s)),
+            Payload::SettingOk(s) => {
+                debug!("mensaje SettingOk recibido desde manager");
+                Some(to_edge::Payload::SettingOk(s))
+            },
+            Payload::UpdateFirmware(u) => {
+                debug!("mensaje UpdateFirmware recibido desde manager");
+                Some(to_edge::Payload::UpdateFirmware(u))
+            },
+            Payload::Network(n) => {
+                debug!("mensaje Network recibido desde manager");
+                Some(to_edge::Payload::Network(n))
+            },
+            Payload::DeleteHub(d) => {
+                debug!("mensaje DeleteHub recibido desde manager");
+                Some(to_edge::Payload::DeleteHub(d))
+            },
+            Payload::Settings(s) => {
+                debug!("mensaje Settings recibido desde manager");
+                Some(to_edge::Payload::Settings(s))
+            },
         };
 
         if let Some(payload) = to_edge_payload {
@@ -222,7 +248,7 @@ pub async fn process_from_data(msg: FromDataSaver,
     use crate::grpc::from_data_saver::Payload;
 
     if let Some(payload) = msg.payload {
-        debug!("Debug: mensaje recibido desde data");
+        debug!("mensaje Heartbeat desde data");
         let to_edge_payload = match payload {
             Payload::Heartbeat(heartbeat) => {
                 Some(to_edge::Payload::Heartbeat(heartbeat))
