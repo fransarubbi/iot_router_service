@@ -196,6 +196,18 @@ pub async fn process_from_edge(msg: FromEdge, central_tx: &mpsc::Sender<RouterMe
                     error!("Error: no se pudo enviar mensaje a traves de central_tx");
                 }
             },
+            Payload::NetworkAck(network_ack) => {
+                debug!("mensaje NetworkAck recibido desde edge");
+                let router_msg = RouterMessage::ToManager {
+                    message: ToManager {
+                        edge_id: msg.edge_id.clone(),
+                        payload: Some(to_manager::Payload::NetworkAck(network_ack)),
+                    },
+                };
+                if central_tx.send(router_msg).await.is_err() {
+                    error!("Error: no se pudo enviar mensaje a traves de central_tx");
+                }
+            },
         }
     }
 }
