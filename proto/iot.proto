@@ -48,6 +48,7 @@ message FromEdge {
     AlertAirBatch alert_air_batch = 13;
     AlertThBatch alert_th_batch = 14;
     EdgeState edge_state = 15;
+    NetworkAck network_ack = 16;
   }
 }
 
@@ -59,6 +60,7 @@ message ToManager {
     FirmwareOutcome firmware_outcome = 4;
     HelloWorld hello_world = 5;
     EdgeState edge_state = 6;
+    NetworkAck network_ack = 7;
   }
 }
 
@@ -190,6 +192,12 @@ message Network {
   string name_network = 3;
   bool active = 4;
   bool delete_network = 5;
+}
+
+message NetworkAck {
+  Metadata metadata = 1;
+  string id_network = 2;
+  uint32 code_of_ack = 3;
 }
 
 message DeleteHub {
