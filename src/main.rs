@@ -1,31 +1,27 @@
+mod config;
+mod connections;
+mod error;
 mod grpc_service;
+mod https;
+mod message;
+mod metrics;
+mod middleware;
 mod router;
 mod system;
-mod config;
-mod https;
-mod metrics;
-mod connections;
-mod mtls;
-mod error;
-mod middleware;
-mod message;
 
 pub mod grpc {
     tonic::include_proto!("grpc");
 }
 
-
-use tokio::sync::mpsc;
-use tracing::info;
 use crate::grpc_service::domain::{DataServiceImpl, EdgeServiceImpl, ManagerServiceImpl};
 use crate::https::domain::HttpsService;
-use crate::router::domain::{dispatcher_task, RouterMessage, RoutingTable};
-use crate::system::domain::{init_server, init_tracing, System};
-
+use crate::router::domain::{RouterMessage, RoutingTable, dispatcher_task};
+use crate::system::domain::{System, init_server, init_tracing};
+use tokio::sync::mpsc;
+use tracing::info;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-
     let _ = rustls::crypto::ring::default_provider().install_default();
 
     let system = System::new()?;
@@ -47,11 +43,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let data_service = DataServiceImpl::new(routing_table.clone(), central_tx.clone());
     let https_service = HttpsService::new(central_tx.clone());
 
-    init_server(edge_service,
-                manager_service,
-                data_service,
-                https_service,
-                &system).await?;
+    init_server(
+        edge_service,
+        manager_service,
+        data_service,
+        https_service,
+        &system,
+    )
+    .await?;
 
     Ok(())
 }

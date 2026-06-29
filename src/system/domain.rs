@@ -5,19 +5,18 @@
 //! 2. Inicializar el sistema de Trazabilidad (Logging estructurado).
 //! 3. Configurar y levantar los servidores gRPC (Edge y Manager) con sus respectivas políticas de seguridad.
 
-
-use std::{env, fs};
-use tonic::transport::{Certificate, Identity, Server, ServerTlsConfig};
-use tracing::info;
-use tracing_subscriber::{fmt, EnvFilter};
 use crate::config::certs::{CA_ROUTER, CRT_ROUTER, KEY_ROUTER};
-use crate::metrics::logic::init_global;
 use crate::grpc::data_service_server::DataServiceServer;
 use crate::grpc::edge_service_server::EdgeServiceServer;
 use crate::grpc::manager_service_server::ManagerServiceServer;
 use crate::grpc_service::domain::{DataServiceImpl, EdgeServiceImpl, ManagerServiceImpl};
 use crate::https::domain::HttpsService;
-
+use crate::metrics::logic::init_global;
+use axum_server::Server as AxumServer;
+use std::{env, fs};
+use tonic::transport::{Certificate, Identity, Server, ServerTlsConfig};
+use tracing::info;
+use tracing_subscriber::{EnvFilter, fmt};
 
 #[derive(Debug)]
 pub struct System {
@@ -33,6 +32,12 @@ pub struct System {
     /// Por defecto: `50052`.
     pub grpc_port_server: u16,
 
+    /// Host donde se conectará el servicio HTTPS.
+    pub https_host: String,
+
+    /// Puerto para la conexión.
+    pub https_port: u16,
+
     /// Entorno de ejecución actual (`development`, `staging`, `production`).
     /// Controla el formato de logs y la carga de configuraciones.
     pub environment: String,
@@ -41,27 +46,22 @@ pub struct System {
     pub rust_log: String,
 }
 
-
 impl System {
-
     /// Constructor que carga la configuración del entorno.
     ///
     /// # Errores
     /// Retorna error si los puertos configurados no son números válidos.
     pub fn new() -> Result<Self, Box<dyn std::error::Error>> {
-
         info!("Info: creando objeto system");
 
-        let environment = env::var("ENVIRONMENT")
-            .unwrap_or_else(|_| "development".into());
+        let environment = env::var("ENVIRONMENT").unwrap_or_else(|_| "development".into());
 
         if environment == "development" {
             dotenv::dotenv().ok();
         }
 
         Ok(System {
-            grpc_host: env::var("GRPC_HOST")
-                .unwrap_or("localhost".to_string()),
+            grpc_host: env::var("GRPC_HOST").unwrap_or("localhost".to_string()),
 
             grpc_port_edge: env::var("GRPC_PORT_EDGE")
                 .unwrap_or("50051".to_string())
@@ -73,20 +73,23 @@ impl System {
                 .parse()
                 .expect("GRPC_PORT_SERVER debe ser un número"),
 
-            rust_log: env::var("RUST_LOG")
-                .unwrap_or_else(|_| {
-                    match environment.as_str() {
-                        "development" => "debug".to_string(),
-                        "staging" => "info".to_string(),
-                        _ => "warn".to_string(),
-                    }
-                }),
+            https_host: env::var("HTTPS_HOST").unwrap_or("0.0.0.0".to_string()),
+
+            https_port: env::var("HTTPS_PORT")
+                .unwrap_or("8080".to_string())
+                .parse()
+                .expect("HTTPS_PORT debe ser un número"),
+
+            rust_log: env::var("RUST_LOG").unwrap_or_else(|_| match environment.as_str() {
+                "development" => "debug".to_string(),
+                "staging" => "info".to_string(),
+                _ => "warn".to_string(),
+            }),
 
             environment,
         })
     }
 }
-
 
 /// Inicializa el sistema de trazabilidad y logs (Tracing).
 ///
@@ -97,14 +100,9 @@ impl System {
 /// # Argumentos
 /// * `system`: Referencia a la configuración cargada para leer el nivel de log (`rust_log`).
 pub fn init_tracing(system: &System) {
+    let filter = EnvFilter::try_new(&system.rust_log).unwrap_or_else(|_| EnvFilter::new("info"));
 
-    let filter = EnvFilter::try_new(&system.rust_log)
-        .unwrap_or_else(|_| EnvFilter::new("info"));
-
-    let builder = fmt()
-        .pretty()
-        .with_env_filter(filter)
-        .with_target(false);
+    let builder = fmt().pretty().with_env_filter(filter).with_target(false);
 
     if system.environment == "production" {
         builder.json().init();
@@ -112,7 +110,6 @@ pub fn init_tracing(system: &System) {
         builder.pretty().init();
     }
 }
-
 
 /// Inicializa y ejecuta los servidores gRPC concurrentemente.
 ///
@@ -125,13 +122,13 @@ pub fn init_tracing(system: &System) {
 /// * `manager_service`: Implementación de la lógica para el Manager.
 /// * `data_service`: Implementación de la lógica para Data Saver.
 /// * `system`: Configuración global (puertos, host).
-pub async fn init_server(edge_service: EdgeServiceImpl,
-                         manager_service: ManagerServiceImpl,
-                         data_service: DataServiceImpl,
-                         https_service: HttpsService,
-                         system: &System,
+pub async fn init_server(
+    edge_service: EdgeServiceImpl,
+    manager_service: ManagerServiceImpl,
+    data_service: DataServiceImpl,
+    https_service: HttpsService,
+    system: &System,
 ) -> Result<(), Box<dyn std::error::Error>> {
-
     // ════════════════════════════════════════════════════════════════════
     // Configuración de Seguridad (mTLS)
     // ════════════════════════════════════════════════════════════════════
@@ -155,6 +152,7 @@ pub async fn init_server(edge_service: EdgeServiceImpl,
     // ════════════════════════════════════════════════════════════════════
     let addr_edge = format!("{}:{}", system.grpc_host, system.grpc_port_edge).parse()?;
     let addr_server = format!("{}:{}", system.grpc_host, system.grpc_port_server).parse()?;
+    let addr_http = format!("{}:{}", system.https_host, system.https_port).parse()?;
 
     // ════════════════════════════════════════════════════════════════════
     // Lanzamiento de Servidores
@@ -170,7 +168,7 @@ pub async fn init_server(edge_service: EdgeServiceImpl,
             .add_service(
                 EdgeServiceServer::new(edge_service)
                     .send_compressed(tonic::codec::CompressionEncoding::Gzip)
-                    .accept_compressed(tonic::codec::CompressionEncoding::Gzip)
+                    .accept_compressed(tonic::codec::CompressionEncoding::Gzip),
             )
             .serve(addr_edge)
             .await
@@ -179,40 +177,42 @@ pub async fn init_server(edge_service: EdgeServiceImpl,
     let mgmt_server = async {
         info!("Info: servidor apis escuchando en {}", addr_server);
         Server::builder()
-            .add_service(ManagerServiceServer::new(manager_service)
-                .send_compressed(tonic::codec::CompressionEncoding::Gzip)
-                .accept_compressed(tonic::codec::CompressionEncoding::Gzip))
-            .add_service(DataServiceServer::new(data_service)
-                .send_compressed(tonic::codec::CompressionEncoding::Gzip)
-                .accept_compressed(tonic::codec::CompressionEncoding::Gzip))
+            .add_service(
+                ManagerServiceServer::new(manager_service)
+                    .send_compressed(tonic::codec::CompressionEncoding::Gzip)
+                    .accept_compressed(tonic::codec::CompressionEncoding::Gzip),
+            )
+            .add_service(
+                DataServiceServer::new(data_service)
+                    .send_compressed(tonic::codec::CompressionEncoding::Gzip)
+                    .accept_compressed(tonic::codec::CompressionEncoding::Gzip),
+            )
             .serve(addr_server)
             .await
     };
 
     init_global();
 
-    https_service.registry.clone().start_reaper(std::time::Duration::from_secs(10));
+    https_service
+        .registry
+        .clone()
+        .start_reaper(std::time::Duration::from_secs(10));
     let https_app = crate::https::domain::build_router(https_service.clone());
 
-    let axum_tls_config = axum_server::tls_rustls::RustlsConfig::from_config(
-        crate::mtls::logic::build_mtls_config(CRT_ROUTER, KEY_ROUTER, CA_ROUTER)?
-    );
-
-    let addr_https = format!("{}:{}", system.grpc_host, 443).parse()?;
-
-    let https_server = async {
-        info!("Info: servidor HTTPS mTLS escuchando en {}", addr_https);
-        axum_server::bind_rustls(addr_https, axum_tls_config)
-            .serve(https_app.into_make_service_with_connect_info::<std::net::SocketAddr>())
+    let http_server = async {
+        info!("Info: servidor HTTP (sin TLS) escuchando en {}", addr_http);
+        AxumServer::bind(addr_http)
+            .serve(https_app.into_make_service())
             .await
+            .map_err(anyhow::Error::from)
     };
 
     info!("Info: iniciando todos los servicios gRPC y HTTPS...");
-    
+
     tokio::try_join!(
         async { edge_server.await.map_err(anyhow::Error::from) },
         async { mgmt_server.await.map_err(anyhow::Error::from) },
-        async { https_server.await.map_err(anyhow::Error::from) }
+        async { http_server.await.map_err(anyhow::Error::from) }
     )?;
 
     Ok(())
