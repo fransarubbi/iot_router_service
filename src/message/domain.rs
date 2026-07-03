@@ -1,5 +1,4 @@
-use serde::{Serialize, Deserialize};
-
+use serde::{Deserialize, Serialize};
 
 /// Metadatos estándar para todos los mensajes del sistema.
 ///
@@ -11,16 +10,14 @@ pub struct Metadata {
     pub timestamp: i64,
 }
 
-
 /// Alerta de calidad de aire.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AlertAir {
     pub metadata: Metadata,
     pub network: String,
-    pub co2_initial_ppm: f32,
-    pub co2_actual_ppm: f32,
+    pub initial_air_quality: f32,
+    pub actual_air_quality: f32,
 }
-
 
 /// Alerta de Temperatura y Humedad.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -30,7 +27,6 @@ pub struct AlertTh {
     pub initial_temp: f32,
     pub actual_temp: f32,
 }
-
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(untagged)]
