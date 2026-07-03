@@ -6,29 +6,30 @@
 //! binarios (MessagePack) y los inyecta en el bus de mensajes principal
 //! (gRPC dispatcher) del sistema IoT.
 
-
 use crate::connections::logic::ConnectionRegistry;
-use anyhow::Result;
-use axum::{extract::{ConnectInfo, State}, middleware as axum_middleware,response::Json, routing::get, Router};
-use std::{net::SocketAddr, time::Duration};
-use axum::body::Bytes;
-use axum::routing::post;
-use rmp_serde::from_slice;
-use serde_json::{json, Value};
-use tokio::sync::mpsc;
-use tower_http::{
-    timeout::TimeoutLayer,
-    trace::TraceLayer,
-};
-use axum::extract::DefaultBodyLimit;
 use crate::error::domain::AppError;
 use crate::grpc;
-use crate::grpc::{to_data_saver, ToDataSaver};
-use crate::message::domain::{Message};
-use crate::metrics::logic::{metrics_handler};
+use crate::grpc::{ToDataSaver, to_data_saver};
+use crate::message::domain::Message;
+use crate::metrics::logic::metrics_handler;
 use crate::middleware::logic::{record_metrics, request_id};
 use crate::router::domain::RouterMessage;
-
+use anyhow::Result;
+use axum::body::Bytes;
+use axum::extract::DefaultBodyLimit;
+use axum::routing::post;
+use axum::{
+    Router,
+    extract::{ConnectInfo, State},
+    middleware as axum_middleware,
+    response::Json,
+    routing::get,
+};
+use rmp_serde::from_slice;
+use serde_json::{Value, json};
+use std::{net::SocketAddr, time::Duration};
+use tokio::sync::mpsc;
+use tower_http::{timeout::TimeoutLayer, trace::TraceLayer};
 
 /// Estado global compartido para todos los handlers de la interfaz HTTPS.
 ///
@@ -43,7 +44,6 @@ pub struct HttpsService {
     pub central_tx: mpsc::Sender<RouterMessage>,
 }
 
-
 impl HttpsService {
     /// Construye una nueva instancia del servicio HTTPS.
     ///
@@ -53,14 +53,12 @@ impl HttpsService {
         Self {
             // Se define un tiempo de inactividad de 60 segundos antes de considerar muerta una conexión
             registry: ConnectionRegistry::new(Duration::from_secs(60)),
-            central_tx
+            central_tx,
         }
     }
 }
 
-
 // ── Construcción del Router ───────────────────────────────────────────────────
-
 
 /// Ensambla el enrutador HTTP de Axum con todas sus rutas y middlewares.
 ///
@@ -90,9 +88,7 @@ pub fn build_router(state: HttpsService) -> Router {
         .layer(TraceLayer::new_for_http())
 }
 
-
 // ── Handlers ──────────────────────────────────────────────────────────────────
-
 
 /// Endpoint principal de conexión (`GET /connect`).
 ///
@@ -103,7 +99,6 @@ async fn handle_connection(
     ConnectInfo(addr): ConnectInfo<SocketAddr>,
     State(state): State<HttpsService>,
 ) -> Json<Value> {
-
     let client_cn = format!("client@{}", addr.ip());
     let conn_id = state.registry.register(client_cn.clone(), addr.to_string());
     state.registry.touch(&conn_id);
@@ -115,7 +110,6 @@ async fn handle_connection(
         "message": "Conexión mTLS establecida y registrada"
     }))
 }
-
 
 /// Endpoint de recepción de telemetría (`POST /alerts`).
 ///
@@ -130,7 +124,8 @@ async fn handle_telemetry(
     State(state): State<HttpsService>,
     // Bytes extrae el payload crudo de la petición HTTPS
     body: Bytes,
-) -> Result<Json<Value>, AppError> { // Idealmente usar tu AppError
+) -> Result<Json<Value>, AppError> {
+    // Idealmente usar tu AppError
 
     if let Ok(decoded) = from_slice(&body) {
         match decoded {
@@ -151,9 +146,11 @@ async fn handle_telemetry(
                     },
                 };
                 if state.central_tx.send(router_msg).await.is_err() {
-                    return Err(AppError::AlertError("Error: no se pudo enviar mensaje AlertTh".to_string()));
+                    return Err(AppError::AlertError(
+                        "Error: no se pudo enviar mensaje AlertTh".to_string(),
+                    ));
                 }
-            },
+            }
             Message::AlertAir(alert) => {
                 let grpc_alert = grpc::AlertAir {
                     metadata: Some(grpc::Metadata {
@@ -162,8 +159,8 @@ async fn handle_telemetry(
                         timestamp: alert.metadata.timestamp,
                     }),
                     network: alert.network,
-                    co2_initial_ppm: alert.co2_initial_ppm,
-                    co2_actual_ppm: alert.co2_actual_ppm,
+                    initial_air_quality: alert.initial_air_quality,
+                    actual_air_quality: alert.actual_air_quality,
                 };
                 let router_msg = RouterMessage::ToData {
                     message: ToDataSaver {
@@ -171,17 +168,20 @@ async fn handle_telemetry(
                     },
                 };
                 if state.central_tx.send(router_msg).await.is_err() {
-                    return Err(AppError::AlertError("Error: no se pudo enviar mensaje AlertAir".to_string()));
+                    return Err(AppError::AlertError(
+                        "Error: no se pudo enviar mensaje AlertAir".to_string(),
+                    ));
                 }
             }
         }
     } else {
-        return Err(AppError::AlertError("Error: no se pudo deserializar mensaje de alerta".to_string()));
+        return Err(AppError::AlertError(
+            "Error: no se pudo deserializar mensaje de alerta".to_string(),
+        ));
     }
 
     Ok(Json(json!({"status": "recibido y enrutado"})))
 }
-
 
 /// Endpoint de diagnóstico de salud del servicio (`GET /status`).
 ///
@@ -194,7 +194,6 @@ async fn handle_status(State(state): State<HttpsService>) -> Json<Value> {
         "version": env!("CARGO_PKG_VERSION"),
     }))
 }
-
 
 /// Endpoint administrativo de listado de conexiones (`GET /connections`).
 ///
