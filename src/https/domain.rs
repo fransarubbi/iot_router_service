@@ -10,7 +10,7 @@ use crate::connections::logic::ConnectionRegistry;
 use crate::error::domain::AppError;
 use crate::grpc;
 use crate::grpc::{ToDataSaver, to_data_saver};
-use crate::message::domain::Message;
+use crate::message::domain::{AlertAir, AlertTh};
 use crate::metrics::logic::metrics_handler;
 use crate::middleware::logic::{record_metrics, request_id};
 use crate::router::domain::RouterMessage;
@@ -25,7 +25,6 @@ use axum::{
     response::Json,
     routing::get,
 };
-use rmp_serde::from_slice;
 use serde_json::{Value, json};
 use std::{net::SocketAddr, time::Duration};
 use tokio::sync::mpsc;
@@ -122,65 +121,70 @@ async fn handle_connection(
 /// es inválido o si el canal interno de gRPC está saturado o cerrado.
 async fn handle_telemetry(
     State(state): State<HttpsService>,
-    // Bytes extrae el payload crudo de la petición HTTPS
     body: Bytes,
 ) -> Result<Json<Value>, AppError> {
-    // Idealmente usar tu AppError
 
-    if let Ok(decoded) = from_slice(&body) {
-        match decoded {
-            Message::AlertTh(alert) => {
-                let grpc_alert = grpc::AlertTh {
-                    metadata: Some(grpc::Metadata {
-                        sender_user_id: alert.metadata.sender_user_id,
-                        destination_id: alert.metadata.destination_id,
-                        timestamp: alert.metadata.timestamp,
-                    }),
-                    network: alert.network,
-                    initial_temp: alert.initial_temp,
-                    actual_temp: alert.actual_temp,
-                };
-                let router_msg = RouterMessage::ToData {
-                    message: ToDataSaver {
-                        payload: Some(to_data_saver::Payload::AlertTh(grpc_alert)),
-                    },
-                };
-                if state.central_tx.send(router_msg).await.is_err() {
-                    return Err(AppError::AlertError(
-                        "Error: no se pudo enviar mensaje AlertTh".to_string(),
-                    ));
-                }
-            }
-            Message::AlertAir(alert) => {
-                let grpc_alert = grpc::AlertAir {
-                    metadata: Some(grpc::Metadata {
-                        sender_user_id: alert.metadata.sender_user_id,
-                        destination_id: alert.metadata.destination_id,
-                        timestamp: alert.metadata.timestamp,
-                    }),
-                    network: alert.network,
-                    initial_air_quality: alert.initial_air_quality,
-                    actual_air_quality: alert.actual_air_quality,
-                };
-                let router_msg = RouterMessage::ToData {
-                    message: ToDataSaver {
-                        payload: Some(to_data_saver::Payload::AlertAir(grpc_alert)),
-                    },
-                };
-                if state.central_tx.send(router_msg).await.is_err() {
-                    return Err(AppError::AlertError(
-                        "Error: no se pudo enviar mensaje AlertAir".to_string(),
-                    ));
-                }
-            }
-        }
-    } else {
-        return Err(AppError::AlertError(
-            "Error: no se pudo deserializar mensaje de alerta".to_string(),
-        ));
+    match rmp_serde::from_slice::<serde_json::Value>(&body) {
+        Ok(json_val) => tracing::error!("payload recibido desde el Hub: {}", json_val),
+        Err(e) => tracing::error!(">>> el payload está roto (basura o truncado): {:?}", e),
     }
 
-    Ok(Json(json!({"status": "recibido y enrutado"})))
+    // Intentamos parsear como Alerta de Aire
+    match rmp_serde::from_slice::<AlertAir>(&body) {
+        Ok(alert) => {
+            let grpc_alert = grpc::AlertAir {
+                metadata: Some(grpc::Metadata {
+                    sender_user_id: alert.metadata.sender_user_id,
+                    destination_id: alert.metadata.destination_id,
+                    timestamp: alert.metadata.timestamp as i64,
+                }),
+                network: alert.network,
+                initial_air_quality: alert.initial_air_quality,
+                actual_air_quality: alert.actual_air_quality,
+            };
+            let router_msg = RouterMessage::ToData {
+                message: ToDataSaver {
+                    payload: Some(to_data_saver::Payload::AlertAir(grpc_alert)),
+                },
+            };
+            
+            if state.central_tx.send(router_msg).await.is_err() {
+                return Err(AppError::AlertError("Error interno: canal cerrado".to_string()));
+            }
+            return Ok(Json(serde_json::json!({"status": "recibido y enrutado"})));
+        }
+        Err(_) => {}
+    }
+
+    match rmp_serde::from_slice::<AlertTh>(&body) {
+        Ok(alert) => {
+            let grpc_alert = grpc::AlertTh {
+                metadata: Some(grpc::Metadata {
+                    sender_user_id: alert.metadata.sender_user_id,
+                    destination_id: alert.metadata.destination_id,
+                    timestamp: alert.metadata.timestamp as i64,
+                }),
+                network: alert.network,
+                initial_temp: alert.initial_temp,
+                actual_temp: alert.actual_temp,
+            };
+            let router_msg = RouterMessage::ToData {
+                message: ToDataSaver {
+                    payload: Some(to_data_saver::Payload::AlertTh(grpc_alert)),
+                },
+            };
+            
+            if state.central_tx.send(router_msg).await.is_err() {
+                return Err(AppError::AlertError("Error interno: canal cerrado".to_string()));
+            }
+            return Ok(Json(serde_json::json!({"status": "recibido y enrutado"})));
+        }
+        Err(_) => {}
+    }
+
+    // 3. Si ambos fallan, el payload es inválido o no corresponde a una alerta
+    tracing::error!("El payload recibido no pudo ser deserializado como AlertAir ni AlertTh");
+    Err(AppError::AlertError("Error: payload no coincide con ninguna alerta conocida".to_string()))
 }
 
 /// Endpoint de diagnóstico de salud del servicio (`GET /status`).
